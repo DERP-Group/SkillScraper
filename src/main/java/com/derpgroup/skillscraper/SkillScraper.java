@@ -32,10 +32,15 @@ public class SkillScraper {
     SkillsWrapper skillsWrapper = deserialize(response, new TypeReference<SkillsWrapper>(){});
     System.out.println("Found " + skillsWrapper.getApps().size() + " skills");
     
-    checkForShit(skillsWrapper.getApps());
+    checkForShitOnSkills(skillsWrapper.getApps());
+    
+    //TODO: get skill reviews by skill
+    //TODO: checkForShitOnReviews (reviewer id; reviewer name matches skill vendor name)
+    //TODO: store data somewhere
+    //TODO: checkForChangesInStoredShit (deleted reviews, statistically significant changes in review volume)
   }
   
-  private static void checkForShit(List<Skill> skills) {
+  private static void checkForShitOnSkills(List<Skill> skills) {
     for(Skill skill : skills){
       if(!skill.isCanDisable()){
         continue; //Ignore dev skills
@@ -51,6 +56,10 @@ public class SkillScraper {
       if(skill.getEnablement() != null){
         System.out.println("Enablement was non-null for skill '" + skill.getName() + "': " + skill.getEnablement().toString());
       }
+      
+      //TODO: What's up with capabilities?
+      //TODO: Skill types?
+      //TODO: Enablement vs top level fields?
     }
   }
 
