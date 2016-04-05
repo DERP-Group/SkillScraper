@@ -34,24 +34,21 @@ public class SkillScraper {
     mapper.enable(SerializationFeature.INDENT_OUTPUT);
     
     String response  = getSkillsResponse();
-    System.out.println(response);
     
-    SkillsWrapper skillsWrapper = deserialize(response, new TypeReference<SkillsWrapper>(){});
-    System.out.println("Found " + skillsWrapper.getApps().size() + " skills");
+    List<Skill> skills = deserialize(response, new TypeReference<SkillsWrapper>(){}).getApps();
+    System.out.println("Found " + skills.size() + " skills");
     
-    checkForShitOnSkills(skillsWrapper.getApps());
+    Map<Skill, SkillReviewsResponse> skillReviewsBySkillId = getReviewsForSkills(skills);
     
-    Map<Skill, SkillReviewsResponse> skillReviewsBySkillId = getReviewsForSkills(skillsWrapper.getApps());
+    System.out.println("Found reviews for " + skillReviewsBySkillId.size() + " skills.");
+      
+    SkillsFileUtils.writeShitOut(skillReviewsBySkillId);
     
-    System.out.println("Found reviews for " + skillReviewsBySkillId.size() + " reviews.");
-    
+    checkForShitOnSkills(skills);
     checkForShitOnReviews(skillReviewsBySkillId);
-    
-   SkillsFileUtils.writeShitOut(skillReviewsBySkillId);
-    
+      
     //TODO: checkForShitOnReviews (reviewer id; reviewer name matches skill vendor name, Donald C. Lindenmuth)
     //TODO: checkForChangesInStoredShit (deleted reviews, statistically significant changes in review volume)
-   
   }
 
   
