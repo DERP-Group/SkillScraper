@@ -1,0 +1,12 @@
+##Properties for SkillScraper
+
+## Connection info
+url = https://pitangui.amazon.com/api
+cookieString = at-main=%s; ubid-main=%s
+atMain = <REPLACE-WITH-REAL-VALUE>
+ubidMain = <REPLACE-WITH-REAL-VALUE>
+
+## Rate limiting
+#sleepTimeMillis is set to 10sec to avoid setting off hundreds of requests in quick succession
+sleepTimeMillis = 10000
+maxSkillsToCheck = -1 

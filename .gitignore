@@ -1,6 +1,7 @@
 ### Application ###
 *.log
 output/
+src/main/resources/conf/SkillScraper.properties
 
 ### Certs and keystores ###
 

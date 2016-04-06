@@ -1,170 +1,79 @@
+/**
+ * Copyright (C) 2016 David Phillips
+ * Copyright (C) 2016 Eric Olson
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package com.derpgroup.skillscraper;
 
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.Unirest;
-import com.mashape.unirest.http.exceptions.UnirestException;
-import com.mashape.unirest.request.GetRequest;
-
-public class SkillScraper {
-
-  private static final String SKILLS_ENDPOINT = "/skills/entitlements";
-  private static final String SKILL_REVIEWS_ENDPOINT = "/skill/review/get-reviews/%s/%d";
-  private static String url = "https://pitangui.amazon.com/api";
-  private static String cookieString = "at-main=%s; ubid-main=%s";
-  private static String atMain = "Atza|IQEBLzAtAhUAkXF1RBsfzVGg5QeNKwHqkK22N-4CFHGLnE3SOXaZtqlY70XBWgV9Zk_KnxLldSLDYES3FtKIhIto1BjhlpEFOQ0toVyTJYV7DhTo6pZg0glID7WhWmdXgzJvH1GRrG3bMj8l686qm1r4_2gnwV1yN8GwpoBXZIjmr6jjftb0ugCZ8Cav5wmhuAX6ZrXZipDhvBCg24Z4c5Bg5XB9jm_k229csg3L1vpD83UiaD_Q5gDGSLMUPuKmSEu9YI476xiRPy_yaz3mlp8iEM-QV3o3XcbPjwCVshLhDSCXeEjeR-hhJF4fV-50cfukJgv4FxlclREHYNX4NZ42FzE";
-  private static String ubidMain = "179-4973632-4294533";
-  private static int sleepTimeMillis = 10000;
-  private static int maxSkillsToCheck = -1;
-
-  private static ObjectMapper mapper;
-  
+/**
+ * Utility for aggregating information about skills and skill reviews.
+ * @author Eric
+ *
+ */
+public class SkillScraper {  
 
   public static void main(String[] args) {
-    mapper = new ObjectMapper();
-    mapper.enable(SerializationFeature.INDENT_OUTPUT);
     
-    String response  = getSkillsResponse();
+    if(args == null || args.length < 1){
+      System.err.println("No arguments provided, which means required argument 'configFileLocation' not found.");
+      System.exit(1);
+    }
     
-    List<Skill> skills = deserialize(response, new TypeReference<SkillsWrapper>(){}).getApps();
-    System.out.println("Found " + skills.size() + " skills");
+    String configFileLocation = args[0];
     
-    Map<Skill, SkillReviewsResponse> skillReviewsBySkillId = getReviewsForSkills(skills);
+    SkillScraperClient client = new SkillScraperClient(configFileLocation);
     
-    System.out.println("Found reviews for " + skillReviewsBySkillId.size() + " skills.");
+    List<Skill> skills = client.getSkillsResponse();
+    
+    Map<Skill, SkillReviewsResponse> skillReviewsBySkillId = client.getReviewsForSkills(skills);
       
     SkillsFileUtils.writeShitOut(skillReviewsBySkillId);
     
-    checkForShitOnSkills(skills);
-    checkForShitOnReviews(skillReviewsBySkillId);
-      
-    //TODO: checkForShitOnReviews (reviewer id; reviewer name matches skill vendor name, Donald C. Lindenmuth)
-    //TODO: checkForChangesInStoredShit (deleted reviews, statistically significant changes in review volume)
+    //Optionally, do some post processing of the data while we have it in memory 
+    analyze(skills, skillReviewsBySkillId);
   }
 
-  
-
-  public static String getSkillsResponse(){
-
-    GetRequest skillsRequest = Unirest.get(url + SKILLS_ENDPOINT);
-    skillsRequest.header("Cookie", String.format(cookieString, atMain,ubidMain));
-    
-    HttpResponse<String> response;
-    try {
-      response = skillsRequest.asString();
-    } catch (UnirestException e) {
-      e.printStackTrace();
-      return null;
-    }
-    
-    return response.getBody();
+  private static void analyze(List<Skill> skills, Map<Skill, SkillReviewsResponse> skillReviewsBySkillId) {
+    analyzeSkills(skills);
+    analyzeSkillReviews(skillReviewsBySkillId);
   }
-  
-  private static Map<Skill, SkillReviewsResponse> getReviewsForSkills(List<Skill> skills) {
-    Map<Skill, SkillReviewsResponse> skillReviewsBySkillId = new HashMap<Skill,SkillReviewsResponse>();
-    
-    if(skills == null || skills.size() < 1){
-      return null;
-    }
-    
-    int i = 0;
+
+  private static void analyzeSkills(List<Skill> skills) {
     for(Skill skill : skills){
-      if(skill.isCanDisable() && skill.getNumberOfReviews() > 0){
-        SkillReviewsResponse skillReviewsResponse = getReviewsForSkill(skill.getAsin());
-        skillReviewsBySkillId.put(skill, skillReviewsResponse);
-        i++;
-      }
-      if(i == maxSkillsToCheck){
-        break;
-      }
-    }
-    return skillReviewsBySkillId;
-  }
-
-  public static SkillReviewsResponse getReviewsForSkill(String asin) {
-
-    int pageIndex = 0;
-    int numReviewsReturned = 0;
-    SkillReviewsResponse skillReviewsOutput = new SkillReviewsResponse();
-    do{
-      System.out.println("Getting reviews for '" + asin + "' from page " + pageIndex);
-      GetRequest skillReviewsRequest = Unirest.get(String.format(url + SKILL_REVIEWS_ENDPOINT, asin, (pageIndex * 10)));
-      skillReviewsRequest.header("Cookie", String.format(cookieString, atMain,ubidMain));
       
-      HttpResponse<String> response;
-      try {
-        response = skillReviewsRequest.asString();
-      } catch (UnirestException e) {
-        e.printStackTrace();
-        return null;
-      }
-      
-      SkillReviewsWrapper wrapper = deserialize(response.getBody(), new TypeReference<SkillReviewsWrapper>(){});
-      if(wrapper == null || wrapper.getSkillReviews() == null){
-        System.out.println("Could not deserialize response.");
-        System.out.println(response);
-        continue;
-      }
-      SkillReviewsResponse skillReviewsResponse = wrapper.getSkillReviews();
-      List<SkillReview> topReviews = skillReviewsResponse.getTopReviews();
-      
-      if(pageIndex == 0){
-        skillReviewsOutput.setTopReviews(topReviews);
-        skillReviewsOutput.setAverageRating(skillReviewsResponse.getAverageRating());
-        skillReviewsOutput.setNumberOfReviews(skillReviewsResponse.getNumberOfReviews());
-      }else{
-        skillReviewsOutput.getTopReviews().addAll(topReviews);
-      }
-      
-      numReviewsReturned = topReviews.size();
-      pageIndex++;
-      
-      try {
-        Thread.sleep(sleepTimeMillis);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }while(numReviewsReturned >= 10);
-    
-    System.out.println("Found " + skillReviewsOutput.getNumberOfReviews() + " reviews for '" + asin + "'.");
-    System.out.println(skillReviewsOutput);
-    
-    return skillReviewsOutput;
-  }
-
-  private static void checkForShitOnSkills(List<Skill> skills) {
-    for(Skill skill : skills){
+      //Ignore dev skills
       if(!skill.isCanDisable()){
-        continue; //Ignore dev skills
+        continue; 
       }
+      
+      //Some sample things you could check
       if(skill.getPermissions() != null){
         System.out.println("Permissions was non-null for skill '" + skill.getName() + "': " + skill.getPermissions());
-      }
-      
-      if(skill.getPamsPartnerId() != null){
-        System.out.println("PamsPartnerId was non-null for skill '" + skill.getName() + "': " + skill.getPamsPartnerId());
       }
       
       if(skill.getEnablement() != null){
         System.out.println("Enablement was non-null for skill '" + skill.getName() + "': " + skill.getEnablement().toString());
       }
-      
-      //TODO: What's up with capabilities?
-      //TODO: Skill types?
-      //TODO: Enablement vs top level fields?
     }
   }
   
-  private static void checkForShitOnReviews(Map<Skill,SkillReviewsResponse> skillReviewsBySkill){
+  private static void analyzeSkillReviews(Map<Skill,SkillReviewsResponse> skillReviewsBySkill){
     if(skillReviewsBySkill == null){
       return;
     }
@@ -190,19 +99,6 @@ public class SkillScraper {
         }
       }
     }
-  }
-  
-  public static <T> T deserialize(String responseString, TypeReference<T> typeReference){
-    try {
-      return mapper.readValue(responseString, typeReference);
-    } catch (JsonParseException e) {
-      e.printStackTrace();
-    } catch (JsonMappingException e) {
-      e.printStackTrace();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    return null;
   }
 
 }

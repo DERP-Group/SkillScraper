@@ -1,3 +1,21 @@
+/**
+ * Copyright (C) 2016 David Phillips
+ * Copyright (C) 2016 Eric Olson
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package com.derpgroup.skillscraper;
 
 import java.io.File;
@@ -37,7 +55,6 @@ public class SkillsFileUtils {
     }
     
     for(Skill skill : skillReviewsBySkill.keySet()){
-
       List<SkillReview> skillReviews = skillReviewsBySkill.get(skill).getTopReviews();
       writeSkill(outputPath, skill, skillReviews);
     }
@@ -67,8 +84,7 @@ public class SkillsFileUtils {
     }
   }
 
-  protected static void writeSkillReviews(String skillOutputPath,
-      List<SkillReview> skillReviews) {
+  protected static void writeSkillReviews(String skillOutputPath, List<SkillReview> skillReviews) {
     String skillReviewsOutputPath = skillOutputPath + "reviews/";
     Path skillReviewsPath = Paths.get(skillReviewsOutputPath);
     try {
@@ -83,10 +99,8 @@ public class SkillsFileUtils {
     }
   }
 
-  protected static void writeSkillReview(String skillReviewsOutputPath,
-      SkillReview skillReview) {
+  protected static void writeSkillReview(String skillReviewsOutputPath, SkillReview skillReview) {
     try {
-      
       mapper.writeValue(new File(skillReviewsOutputPath + skillReview.getReviewId() + ".json"), skillReview);
     } catch (JsonGenerationException e) {
       e.printStackTrace();
